@@ -18,7 +18,7 @@ const sortBy = ref('name-asc')
 // simple region list for Melbourne
 const regions = ['Central','North','South','East','West','South-East']
 
-// computed view: filter + sort
+// computed view
 const dataView = computed(() => {
   const key = q.value.toLowerCase().trim()
   let out = list.value.filter(i => {
@@ -60,9 +60,9 @@ const dataView = computed(() => {
       </div>
     </div>
 
-    <!-- show results as bootstrap cards -->
+    <!-- Responsive grid: 1 col on xs, 2 on sm, 3 on lg, 4 on xxl -->
     <div class="row g-3">
-      <div class="col-12 col-sm-6 col-lg-4" v-for="it in dataView" :key="it.id">
+      <div class="col-12 col-sm-6 col-lg-4 col-xxl-3" v-for="it in dataView" :key="it.id">
         <div class="card h-100">
           <div class="card-body">
             <h5 class="card-title mb-1">
