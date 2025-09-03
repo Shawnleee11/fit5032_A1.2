@@ -1,24 +1,39 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import seed from '../data/locations.js'
 
 const STORAGE_KEY = 'a12_locations'
 const list = ref([])
 
-// load from localStorage first, fallback to seed
+const route = useRoute()
+const router = useRouter()
+const showSaved = ref(false)
+
+// load from localStorage first, fallback to seed; show success alert if coming from Add
 onMounted(() => {
   const raw = localStorage.getItem(STORAGE_KEY)
   list.value = raw ? JSON.parse(raw) : seed
+
+  if (route.query.saved) {
+    showSaved.value = true
+    setTimeout(() => {
+      showSaved.value = false
+      const q = { ...route.query }
+      delete q.saved
+      router.replace({ query: q })
+    }, 2500)
+  }
 })
 
-const q = ref('')        // search keyword
-const region = ref('')   // region filter
+const q = ref('')        
+const region = ref('')   
 const sortBy = ref('name-asc')
 
 // simple region list for Melbourne
 const regions = ['Central','North','South','East','West','South-East']
 
-// computed view
+// computed view: filter , sort
 const dataView = computed(() => {
   const key = q.value.toLowerCase().trim()
   let out = list.value.filter(i => {
@@ -26,10 +41,10 @@ const dataView = computed(() => {
     return (key ? txt.includes(key) : true) && (region.value ? i.region === region.value : true)
   })
   const [field, dir] = sortBy.value.split('-')
-  out.sort((a,b)=>{
-    const va = field==='beneficiaries' ? +a.beneficiaries : `${a.country} ${a.city}`.toLowerCase()
-    const vb = field==='beneficiaries' ? +b.beneficiaries : `${b.country} ${b.city}`.toLowerCase()
-    return dir==='asc' ? (va>vb?1:-1) : (va<vb?1:-1)
+  out.sort((a,b) => {
+    const va = field === 'beneficiaries' ? +a.beneficiaries : `${a.country} ${a.city}`.toLowerCase()
+    const vb = field === 'beneficiaries' ? +b.beneficiaries : `${b.country} ${b.city}`.toLowerCase()
+    return dir === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1)
   })
   return out
 })
@@ -38,6 +53,17 @@ const dataView = computed(() => {
 <template>
   <section class="mt-3">
     <h2 class="mb-3">Where We Work in Melbourne</h2>
+
+    <!-- success alert after saving -->
+    <div v-if="showSaved" class="alert alert-success" role="alert" aria-live="polite">
+      Location saved successfully.
+    </div>
+
+    <!-- stats summary -->
+    <p class="text-muted small mb-3">
+      Showing {{ dataView.length }} locations · Total participants
+      {{ dataView.reduce((sum, i) => sum + i.beneficiaries, 0) }}
+    </p>
 
     <!-- filter controls -->
     <div class="row g-2 mb-3">
@@ -60,8 +86,13 @@ const dataView = computed(() => {
       </div>
     </div>
 
+    <!-- empty state -->
+    <div v-if="dataView.length === 0" class="alert alert-warning" role="status" aria-live="polite">
+      No results match your filters.
+    </div>
+
     <!-- Responsive grid: 1 col on xs, 2 on sm, 3 on lg, 4 on xxl -->
-    <div class="row g-3">
+    <div v-else class="row g-3">
       <div class="col-12 col-sm-6 col-lg-4 col-xxl-3" v-for="it in dataView" :key="it.id">
         <div class="card h-100">
           <div class="card-body">
