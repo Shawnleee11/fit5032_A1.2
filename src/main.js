@@ -1,4 +1,4 @@
-// load bootstrap css globally (week3 lab style)
+// load bootstrap css globally 
 import 'bootstrap/dist/css/bootstrap.min.css'
 
 import { createApp } from 'vue'

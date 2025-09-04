@@ -10,90 +10,139 @@ const route = useRoute()
 const router = useRouter()
 const showSaved = ref(false)
 
-// load from localStorage first, fallback to seed; show success alert if coming from Add
+// filters
+const q = ref('')
+const region = ref('ALL')
+const sortKey = ref('name')   
+const sortDir = ref('asc')   
+// load data 
 onMounted(() => {
   const raw = localStorage.getItem(STORAGE_KEY)
-  list.value = raw ? JSON.parse(raw) : seed
+  list.value = raw
+    ? JSON.parse(raw)
+    : seed.map(it => ({ ...it, ratings: it.ratings || [] }))
 
+  // small toast after Add 
   if (route.query.saved) {
     showSaved.value = true
-    setTimeout(() => {
-      showSaved.value = false
-      const q = { ...route.query }
-      delete q.saved
-      router.replace({ query: q })
-    }, 2500)
+    setTimeout(() => (showSaved.value = false), 1600)
+    router.replace({ query: {} })
   }
 })
 
-const q = ref('')        
-const region = ref('')   
-const sortBy = ref('name-asc')
+// handy: write current list back
+function persist () {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list.value))
+}
 
-// simple region list for Melbourne
-const regions = ['Central','North','South','East','West','South-East']
-
-// computed view: filter , sort
-const dataView = computed(() => {
-  const key = q.value.toLowerCase().trim()
-  let out = list.value.filter(i => {
-    const txt = `${i.country} ${i.city} ${i.region} ${i.blurb}`.toLowerCase()
-    return (key ? txt.includes(key) : true) && (region.value ? i.region === region.value : true)
-  })
-  const [field, dir] = sortBy.value.split('-')
-  out.sort((a,b) => {
-    const va = field === 'beneficiaries' ? +a.beneficiaries : `${a.country} ${a.city}`.toLowerCase()
-    const vb = field === 'beneficiaries' ? +b.beneficiaries : `${b.country} ${b.city}`.toLowerCase()
-    return dir === 'asc' ? (va > vb ? 1 : -1) : (va < vb ? 1 : -1)
-  })
-  return out
+// unique regions for the dropdown
+const regions = computed(() => {
+  const s = new Set(list.value.map(i => i.region).filter(Boolean))
+  return ['ALL', ...Array.from(s).sort()]
 })
+
+// text filter + region filter
+const filtered = computed(() => {
+  const term = q.value.trim().toLowerCase()
+  return list.value.filter(it => {
+    const okRegion = region.value === 'ALL' || it.region === region.value
+    const hay = [it.country, it.city, it.region, it.blurb].join(' ').toLowerCase()
+    const okSearch = !term || hay.includes(term)
+    return okRegion && okSearch
+  })
+})
+
+// sort by name or by participants
+const shown = computed(() => {
+  const arr = [...filtered.value]
+  arr.sort((a, b) => {
+    let A, B
+    if (sortKey.value === 'participants') {
+      A = Number(a.beneficiaries) || 0
+      B = Number(b.beneficiaries) || 0
+    } else {
+      A = (a.country || '').toLowerCase()
+      B = (b.country || '').toLowerCase()
+    }
+    const cmp = A < B ? -1 : A > B ? 1 : 0
+    return sortDir.value === 'asc' ? cmp : -cmp
+  })
+  return arr
+})
+
+// top line stats
+const totalCount = computed(() => shown.value.length)
+const totalParticipants = computed(() =>
+  shown.value.reduce((s, it) => s + (Number(it.beneficiaries) || 0), 0)
+)
+
+// rating: push a score and save
+function addRating (item, score) {
+  const s = Math.max(1, Math.min(5, Number(score)))
+  if (!item.ratings) item.ratings = []
+  item.ratings.push(s)
+  persist()
+}
+
+// average rating
+function avg (arr) {
+  if (!arr || !arr.length) return 0
+  return (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)
+}
+
+// one-click: load demo seed into localStorage (handy during recording)
+function loadDemo () {
+  list.value = seed.map(it => ({ ...it, ratings: it.ratings || [] }))
+  persist()
+}
 </script>
 
 <template>
   <section class="mt-3">
-    <h2 class="mb-3">Where We Work in Melbourne</h2>
+    <div v-if="showSaved" class="alert alert-success">Saved. Back to list.</div>
 
-    <!-- success alert after saving -->
-    <div v-if="showSaved" class="alert alert-success" role="alert" aria-live="polite">
-      Location saved successfully.
-    </div>
-
-    <!-- stats summary -->
-    <p class="text-muted small mb-3">
-      Showing {{ dataView.length }} locations · Total participants
-      {{ dataView.reduce((sum, i) => sum + i.beneficiaries, 0) }}
+    <h2 class="mb-2">Where We Work in Melbourne</h2>
+    <p class="text-muted">
+      Showing <strong>{{ totalCount }}</strong> locations ·
+      Total participants <strong>{{ totalParticipants }}</strong>
     </p>
 
-    <!-- filter controls -->
-    <div class="row g-2 mb-3">
-      <div class="col-12 col-md-6">
-        <input v-model="q" class="form-control" placeholder="Search suburb / LGA / region" />
+    <!-- controls -->
+    <div class="row g-3 align-items-end mb-3">
+      <div class="col-lg-5">
+        <label class="form-label">Search suburb / LGA / region</label>
+        <input class="form-control" v-model="q" placeholder="e.g. North, Box Hill, Yarra..." />
       </div>
-      <div class="col-6 col-md-3">
-        <select v-model="region" class="form-select">
-          <option value="">All regions</option>
+
+      <div class="col-lg-3">
+        <label class="form-label">Region</label>
+        <select class="form-select" v-model="region">
           <option v-for="r in regions" :key="r" :value="r">{{ r }}</option>
         </select>
       </div>
-      <div class="col-6 col-md-3">
-        <select v-model="sortBy" class="form-select">
-          <option value="name-asc">Name ↑</option>
-          <option value="name-desc">Name ↓</option>
-          <option value="beneficiaries-desc">Participants ↓</option>
-          <option value="beneficiaries-asc">Participants ↑</option>
-        </select>
+
+      <div class="col-lg-3">
+        <label class="form-label">Sort</label>
+        <div class="input-group">
+          <select class="form-select" v-model="sortKey">
+            <option value="name">Name</option>
+            <option value="participants">Participants</option>
+          </select>
+          <button class="btn btn-outline-secondary"
+                  @click="sortDir = (sortDir === 'asc' ? 'desc' : 'asc')">
+            {{ sortDir === 'asc' ? '↑' : '↓' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="col-lg-1 text-end">
+        <button class="btn btn-outline-primary w-100" @click="loadDemo">Demo</button>
       </div>
     </div>
 
-    <!-- empty state -->
-    <div v-if="dataView.length === 0" class="alert alert-warning" role="status" aria-live="polite">
-      No results match your filters.
-    </div>
-
-    <!-- Responsive grid: 1 col on xs, 2 on sm, 3 on lg, 4 on xxl -->
-    <div v-else class="row g-3">
-      <div class="col-12 col-sm-6 col-lg-4 col-xxl-3" v-for="it in dataView" :key="it.id">
+    <!-- cards -->
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+      <div class="col" v-for="it in shown" :key="it.id">
         <div class="card h-100">
           <div class="card-body">
             <h5 class="card-title mb-1">
@@ -103,6 +152,18 @@ const dataView = computed(() => {
               {{ it.region }} · Participants: {{ it.beneficiaries }}
             </p>
             <p class="card-text small">{{ it.blurb }}</p>
+
+            <!-- rating block -->
+            <div class="d-flex align-items-center gap-2 mt-2">
+              <strong>Rating:</strong> <span>{{ avg(it.ratings) }}</span>
+            </div>
+            <div class="d-flex gap-2 mt-2">
+              <button class="btn btn-sm btn-outline-secondary" @click="addRating(it, 5)">5</button>
+              <button class="btn btn-sm btn-outline-secondary" @click="addRating(it, 4)">4</button>
+              <button class="btn btn-sm btn-outline-secondary" @click="addRating(it, 3)">3</button>
+              <button class="btn btn-sm btn-outline-secondary" @click="addRating(it, 2)">2</button>
+              <button class="btn btn-sm btn-outline-secondary" @click="addRating(it, 1)">1</button>
+            </div>
           </div>
         </div>
       </div>
