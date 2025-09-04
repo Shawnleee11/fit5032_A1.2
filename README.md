@@ -1,35 +1,17 @@
-# web1.2
+FIT5032 – Assignment 1.2 (Basic Application Development)
 
-This template should help get you started developing with Vue 3 in Vite.
+This is my submission for FIT5032 Assignment 1.2.
+It is a basic web application built with Vue 3 , styled with Bootstrap and meets the requirements in the assignment brief.
 
-## Recommended IDE Setup
 
-[VSCode](https://code.visualstudio.com/) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
 
-## Customize configuration
+Features Implemented
+Vue 3 framework with Vite
+Responsive design (Bootstrap grid & cards)
+Form validation (Register: password rules; Login: student email domain)
+Dynamic data from `locations.js` displayed in Catalogue
+Basic authentication (Register and Login with localStorage)
+Role-based authentication (User , Admin; only Admin can access Addpage)
+User rating with aggregated score (average rating per location, saved locally)
+Basic security checks (domain restriction, cleaned input)
 
-See [Vite Configuration Reference](https://vite.dev/config/).
-
-## Project Setup
-
-```sh
-npm install
-```
-
-### Compile and Hot-Reload for Development
-
-```sh
-npm run dev
-```
-
-### Compile and Minify for Production
-
-```sh
-npm run build
-```
-
-### Lint with [ESLint](https://eslint.org/)
-
-```sh
-npm run lint
-```
